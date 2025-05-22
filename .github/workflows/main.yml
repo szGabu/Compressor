@@ -1,0 +1,104 @@
+name: Manual Build
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Project
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Download and Extract AMX Mod X Base
+        run: |
+          wget https://www.amxmodx.org/amxxdrop/1.9/amxmodx-1.9.0-git5294-base-linux.tar.gz -O base.tar.gz
+          tar -xzf base.tar.gz -C . --strip-components=1
+          rm base.tar.gz
+  
+      - name: Download and Extract Additional Modules
+        run: |
+          MODULES=(
+            cstrike
+            tfc
+            dod
+            ns
+            ts
+            esf
+          )
+          for MODULE in "${MODULES[@]}"; do
+            wget "https://www.amxmodx.org/amxxdrop/1.9/amxmodx-1.9.0-git5294-${MODULE}-linux.tar.gz" -O "${MODULE}.tar.gz"
+            tar -xzf "${MODULE}.tar.gz" -C . --strip-components=1
+            rm "${MODULE}.tar.gz"
+          done
+
+      - name: Clean existing .sma files (we dont need them)
+        run: |
+          rm amxmodx/scripting/*.sma
+          
+      - name: Copy files to Scripting Directory
+        run: |
+          cp -R addons/amxmodx/scripting/* amxmodx/scripting/
+  
+      - name: Verify Setup
+        run: |
+          echo "Contents of amxmodx directory:"
+          tree amxmodx/scripting
+
+      - name: Compile Repository Plugins
+        run: |
+          cd amxmodx/scripting
+          ./compile.sh
+
+      - name: Verify compiled contents
+        run: |
+          echo "Contents of compiled directory:"
+          tree amxmodx/scripting/compiled
+
+      - name: Compile Repository Plugins
+        run: |
+          mkdir plugins
+          cp amxmodx/scripting/compiled/*.amxx addons/amxmodx/plugins
+          rm -rf amxmodx
+
+      - name: Upload Compiled Scripts as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{github.event.repository.name}}-compiled
+          path: .
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{github.event.repository.name}}-compiled
+          path: .
+
+      - name: Verify downloaded artifact  contents
+        run: |
+          echo "Contents of directory:"
+          tree .
+
+      - name: ZIP Contents
+        run: |
+          zip -r ${{github.event.repository.name}}.zip ./
+
+      - name: Get latest tag
+        id: tag
+        run: |
+          echo "TAG=$(curl -s "https://api.github.com/repos/${{ github.repository }}/tags" | jq -r ".[0].name")" >> $GITHUB_ENV
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.TAG }}
+          files: ${{github.event.repository.name}}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
