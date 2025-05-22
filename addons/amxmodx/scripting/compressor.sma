@@ -20,7 +20,7 @@
 // ** COMPILER OPTIONS END HERE **
 
 #define PLUGIN_NAME         		"Compressor"
-#define PLUGIN_VERSION      		"RC-25w21a"
+#define PLUGIN_VERSION      		"RC-25w21b"
 #define PLUGIN_AUTHOR       		"szGabu"
 
 #define TINY_STRING_LENGTH			8
